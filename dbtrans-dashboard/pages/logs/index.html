@@ -1,0 +1,104 @@
+<div class="page-header">
+    <div class="page-title"><span class="page-title-icon"><span data-icon="clock"></span></span>任务历史与日志</div>
+    <div class="page-header-right">
+        <div class="search-box">
+            <input type="text" placeholder="搜索任务名称..." id="logSearchInput" oninput="Logs.filterTable(this.value)">
+        </div>
+        <select class="chart-select" onchange="Logs.changeStatus(this.value)" style="width:100px;">
+            <option value="">全部状态</option>
+            <option value="success">成功</option>
+            <option value="fail">失败</option>
+        </select>
+    </div>
+</div>
+<div class="stats-row" id="logStatsRow">
+    <div class="stat-card blue">
+        <div class="stat-label">总任务</div>
+        <div class="stat-value" id="statTaskCount"><span class="stat-num">--</span><span class="unit">个任务</span></div>
+    </div>
+    <div class="stat-card green">
+        <div class="stat-label">成功 / 错误</div>
+        <div class="stat-value" id="statSuccessError"><span class="stat-num">--</span><span class="unit">次</span></div>
+    </div>
+    <div class="stat-card red">
+        <div class="stat-label">发生异常</div>
+        <div class="stat-value" id="statErrorCount"><span class="stat-num">--</span><span class="unit">次记录</span></div>
+    </div>
+</div>
+<div id="logGroupFolderView"></div>
+<div class="table-container" id="taskListView" style="display:none;">
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+        <span class="detail-link" onclick="Logs._backToLogGroupList()">&larr; 返回分组列表</span>
+        <span style="font-size:13px;color:var(--text-muted);" id="logGroupLabel"></span>
+    </div>
+    <table>
+        <thead><tr><th>同步任务</th><th>上次同步时间</th><th>同步次数</th><th>总成功</th><th>总失败</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="taskListBody">
+            <tr><td colspan="7" style="text-align:center;padding:30px;">加载中...</td></tr>
+        </tbody>
+    </table>
+    <div class="table-footer">
+        <span id="logCountInfo"></span>
+    </div>
+</div>
+<div class="table-container" id="taskLogView" style="display:none;">
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+        <span class="detail-link" onclick="Logs._backToTaskList()">&larr; 返回任务列表</span>
+        <span style="font-size:13px;color:var(--text-muted);" id="taskLogTitle"></span>
+    </div>
+    <table>
+        <thead><tr><th>执行时间</th><th>状态</th><th>同步量</th><th>耗时</th><th>详情</th></tr></thead>
+        <tbody id="taskLogBody">
+            <tr><td colspan="5" style="text-align:center;padding:30px;">加载中...</td></tr>
+        </tbody>
+    </table>
+    <div class="table-footer">
+        <span id="taskLogCountInfo"></span>
+        <div class="pagination" id="taskLogPagination"></div>
+    </div>
+</div>
+
+<template id="tpl-logs-folder-card">
+    <div class="group-folder-card">
+        <div class="group-folder-icon"><span data-icon="folder"></span></div>
+        <div class="group-folder-name"></div>
+        <div class="group-folder-meta"></div>
+        <div class="group-folder-stats" style="margin-top:8px;font-size:11px;color:var(--text-muted);"></div>
+    </div>
+</template>
+
+<template id="tpl-logs-task-row">
+    <tr>
+        <td>
+            <div style="font-weight:500;" class="task-label-div"></div>
+            <div class="task-sched-div" style="font-size:11px;color:var(--text-muted);margin-top:2px;display:none;"></div>
+        </td>
+        <td class="task-last-time"></td>
+        <td class="task-sync-count"></td>
+        <td class="task-success-count" style="color:var(--accent-green);font-weight:500;"></td>
+        <td class="task-fail-count"></td>
+        <td class="task-status"></td>
+        <td><span class="detail-link task-detail-link">查看详情 →</span></td>
+    </tr>
+</template>
+
+<template id="tpl-logs-log-row">
+    <tr>
+        <td class="log-time"></td>
+        <td class="log-status"></td>
+        <td class="log-rows"></td>
+        <td class="log-duration"></td>
+        <td><span class="detail-link log-detail-link">查看详情 →</span></td>
+    </tr>
+</template>
+
+<template id="tpl-logs-compact-task">
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--border-color);">
+        <span class="db-badge src compact-src" style="flex-shrink:0;"></span>
+        <span class="compact-sql-badge" style="font-size:10px;color:var(--accent-purple);background:rgba(155,133,247,.12);padding:1px 6px;border-radius:3px;display:none;">SQL</span>
+        <span style="color:var(--text-muted);">→</span>
+        <span class="db-badge tgt compact-tgt" style="flex-shrink:0;"></span>
+        <span class="compact-status" style="margin-left:auto;flex-shrink:0;"></span>
+    </div>
+</template>
+

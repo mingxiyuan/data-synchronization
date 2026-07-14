@@ -1,0 +1,300 @@
+<div class="page-header">
+    <div class="page-title"><span class="page-title-icon"><span data-icon="clock"></span></span>调度管理</div>
+    <button class="btn btn-primary" onclick="Schedules._showAddModal()">+ 新建调度</button>
+</div>
+<div class="sched-presets-section">
+    <h3 class="sched-section-title">预置调度模板</h3>
+    <p class="sched-section-desc">选择一个预置模板快速创建调度，或在同步配置页面选择已创建的调度</p>
+    <div class="sched-preset-grid" id="schedPresetGrid"></div>
+</div>
+<div class="sched-list-section">
+    <div class="mapping-header">
+        <span class="mapping-title">自定义调度规则</span>
+        <button class="btn btn-sm" onclick="Schedules._loadSchedules()"><span data-icon="refresh"></span> 刷新</button>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead><tr>
+                <th>调度名称</th><th>Cron 表达式</th><th>描述</th><th>关联任务数</th><th>状态</th><th>操作</th>
+            </tr></thead>
+            <tbody id="scheduleListBody">
+                <tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">加载中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 新增/编辑调度模态框（hidden by default） -->
+<div class="modal-overlay" id="scheduleModal" style="display:none;">
+    <div class="modal" style="max-width:560px;">
+        <div class="modal-header">
+            <span class="modal-title" id="scheduleModalTitle">新建调度</span>
+            <button class="modal-close" onclick="Schedules._closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editSchedId" value="">
+            <input type="hidden" id="schedOnceInput" value="false">
+            <div class="form-group">
+                <label class="form-label">调度名称 *</label>
+                <input class="form-input" id="schedNameInput" placeholder="例: 每日全量同步">
+            </div>
+            <div class="form-group" id="schedCronGroup">
+                <label class="form-label">Cron 表达式 *</label>
+                <input class="form-input" id="schedCronInput" placeholder="格式: 秒 分 时 日 月 周 [年]（如: 0 0 2 * * ? 表示每天凌晨2点）" style="font-family:monospace;">
+                <div style="margin-top:6px;font-size:11px;color:var(--text-muted);">
+                    常用示例: <code style="color:var(--accent-blue)">0 */5 * * * ?</code> 每5分钟 &nbsp;|&nbsp;
+                    <code style="color:var(--accent-blue)">0 0 2 * * ?</code> 每天02:00 &nbsp;|&nbsp;
+                    <code style="color:var(--accent-blue)">0 0 8 ? * MON-FRI</code> 工作日08:00
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">描述</label>
+                <input class="form-input" id="schedDescInput" placeholder="可选备注说明">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="Schedules._closeModal()">取消</button>
+            <button class="btn btn-primary" onclick="Schedules._save()">保存</button>
+        </div>
+    </div>
+</div>
+
+<template id="tpl-preset-card">
+    <div class="sched-preset-card">
+        <div class="sched-preset-name"></div>
+        <div class="sched-preset-cron"><code></code></div>
+        <div class="sched-preset-desc"></div>
+    </div>
+</template>
+
+<template id="tpl-schedule-row">
+    <tr>
+        <td><strong></strong></td>
+        <td><code class="sched-cron-code"></code></td>
+        <td class="sched-desc"></td>
+        <td class="sched-task-count">0</td>
+        <td class="sched-status"></td>
+        <td>
+            <div style="display:flex;gap:4px;">
+                <button class="btn btn-sm btn-success btn-trigger" title="立即执行一次"><span data-icon="play"></span> 执行</button>
+                <button class="btn btn-sm btn-edit-sched" title="编辑"><span data-icon="edit"></span> 编辑</button>
+                <button class="btn btn-sm btn-toggle-sched" title="启用/禁用"><span data-icon="pause"></span> 启停</button>
+                <button class="btn btn-sm btn-danger btn-del-sched" title="删除"><span data-icon="trash"></span> 删除</button>
+            </div>
+        </td>
+    </tr>
+</template>
+
+<script>
+var Schedules = {
+
+    _presetSchedules: [
+        { id: 'ps_0',  name: '仅执行一次',   cron: '',                    desc: '创建后立即执行一次，不重复', once: true },
+        { id: 'ps_1',  name: '每分钟',       cron: '0 * * * * ?',        desc: '每分钟执行一次' },
+        { id: 'ps_2',  name: '每5分钟',      cron: '0 */5 * * * ?',     desc: '每隔5分钟执行一次' },
+        { id: 'ps_3',  name: '每15分钟',     cron: '0 */15 * * * ?',    desc: '每隔15分钟执行一次' },
+        { id: 'ps_4',  name: '每30分钟',     cron: '0 */30 * * * ?',    desc: '每隔30分钟执行一次' },
+        { id: 'ps_5',  name: '每小时',       cron: '0 0 * * * ?',       desc: '整点时执行' },
+        { id: 'ps_6',  name: '每天 00:00',   cron: '0 0 0 * * ?',       desc: '每天午夜执行' },
+        { id: 'ps_7',  name: '每天 08:00',   cron: '0 0 8 * * ?',       desc: '每天早上8点执行' },
+        { id: 'ps_8',  name: '每天 12:00',   cron: '0 0 12 * * ?',      desc: '每天中午12点执行' },
+        { id: 'ps_9',  name: '每天 18:00',   cron: '0 0 18 * * ?',      desc: '每天下午6点执行' },
+        { id: 'ps_10', name: '每周一 00:00', cron: '0 0 0 ? * MON',    desc: '每周一凌晨执行' },
+        { id: 'ps_11', name: '每月1号 00:00',cron:'0 0 0 1 * ?',       desc: '每月1号凌晨执行' },
+        { id: 'ps_custom', name: '自定义...',   cron: '',                 desc: '输入自定义Cron表达式' },
+    ],
+
+    _schedules: [],
+    _onScheduleCreated: null,
+
+    async render() {
+        this._renderPresets();
+        this._loadSchedules();
+        this._bindPresetClicks();
+    },
+
+    _renderPresets() {
+        const grid = document.getElementById('schedPresetGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        const tpl = document.getElementById('tpl-preset-card');
+        this._presetSchedules.forEach(ps => {
+            const card = tpl.content.firstElementChild.cloneNode(true);
+            card.setAttribute('data-id', ps.id);
+            card.setAttribute('data-cron', ps.cron);
+            if (ps.once) card.setAttribute('data-once', 'true');
+            card.querySelector('.sched-preset-name').innerHTML = (ps.once ? Icons.zap() : '') + ps.name;
+            const codeEl = card.querySelector('.sched-preset-cron code');
+            codeEl.textContent = ps.cron || (ps.once ? '一次性' : '—');
+            card.querySelector('.sched-preset-desc').textContent = ps.desc;
+            grid.appendChild(card);
+        });
+    },
+
+    _bindPresetClicks() {
+        document.querySelectorAll('.sched-preset-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const id = card.dataset.id;
+                const cron = card.dataset.cron;
+                const once = card.dataset.once === 'true';
+                const name = card.querySelector('.sched-preset-name')?.textContent || '';
+                if (id === 'ps_custom') {
+                    this._showAddModal();
+                } else if (once) {
+                    this._quickOnce(name);
+                } else if (cron) {
+                    this._quickCreate(cron, name);
+                }
+            });
+        });
+    },
+
+    async _quickCreate(cron, presetName) {
+        const name = prompt(`基于「${presetName}」创建调度，请输入调度名称：`, presetName);
+        if (!name) return;
+        try {
+            await Api.saveSchedule({ name, cron, desc: `基于预置: ${presetName}` });
+            App.showToast(`调度「${name}」创建成功`);
+            this._loadSchedules();
+        } catch(e) {}
+    },
+
+    async _quickOnce(presetName) {
+        const name = prompt(`创建一次性调度并立即执行，请输入调度名称：`, presetName);
+        if (!name) return;
+        try {
+            const saved = await Api.saveSchedule({ name, desc: '一次性执行', once: true });
+            App.showToast(`一次性调度「${name}」创建成功，正在执行...`);
+            this._loadSchedules();
+            if (saved?.id) {
+                await Api.triggerSchedule(saved.id);
+                App.showToast(`调度「${name}」已触发执行`);
+            }
+        } catch(e) {}
+    },
+
+    async _loadSchedules() {
+        try {
+            const data = await Api.getSchedules();
+            this._schedules = Array.isArray(data) ? data : [];
+            this._schedules.forEach(s => { s.id = String(s.id); });
+            this._renderList();
+        } catch(error) {
+            console.error('加载调度列表失败:', error);
+            const tbody = document.getElementById('scheduleListBody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--accent-red)">加载失败: ${Utils.esc(error.message)}</td></tr>`;
+        }
+    },
+
+    _renderList() {
+        const tbody = document.getElementById('scheduleListBody');
+        if (!tbody) return;
+
+        if (!this._schedules.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">暂无自定义调度，点击上方按钮或使用预置模板创建</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        const tpl = document.getElementById('tpl-schedule-row');
+        this._schedules.forEach(s => {
+            const row = tpl.content.firstElementChild.cloneNode(true);
+            const sid = Utils.esc(s.id);
+            row.querySelector('strong').textContent = s.name;
+            row.querySelector('.sched-cron-code').textContent = s.cron;
+            row.querySelector('.sched-desc').textContent = s.desc || '-';
+            row.querySelector('.sched-task-count').textContent = s.task_count ?? 0;
+            row.querySelector('.sched-status').innerHTML = s.enabled !== false
+                ? '<span class="status-tag success">● 启用</span>'
+                : '<span class="status-tag fail">■ 禁用</span>';
+            row.querySelector('.btn-trigger').onclick = function() { Schedules._triggerOnce(s.id); };
+            row.querySelector('.btn-edit-sched').onclick = function() { Schedules._edit(s.id); };
+            const toggleBtn = row.querySelector('.btn-toggle-sched');
+            toggleBtn.innerHTML = s.enabled === false ? Icons.play() : Icons.pause();
+            if (s.enabled === false) toggleBtn.classList.add('btn-success');
+            toggleBtn.onclick = function() { Schedules._toggle(s.id); };
+            row.querySelector('.btn-del-sched').onclick = function() { Schedules._delete(s.id); };
+            tbody.appendChild(row);
+        });
+    },
+
+    _showAddModal(editId) {
+        let schedule = null;
+        if (editId) {
+            schedule = this._schedules.find(s => s.id === editId);
+            if (!schedule) return;
+        }
+
+        document.getElementById('scheduleModalTitle').textContent = editId ? '编辑调度' : '新建调度';
+        document.getElementById('editSchedId').value = editId || '';
+        document.getElementById('schedNameInput').value = schedule ? schedule.name : '';
+        document.getElementById('schedCronInput').value = schedule ? (schedule.cron || '') : '';
+        document.getElementById('schedDescInput').value = schedule ? (schedule.desc || '') : '';
+
+        const isOnce = schedule ? !!schedule.once : false;
+        document.getElementById('schedOnceInput').value = isOnce ? 'true' : 'false';
+        document.getElementById('schedCronGroup').style.display = isOnce ? 'none' : '';
+
+        document.getElementById('scheduleModal').style.display = 'flex';
+    },
+
+    _closeModal() {
+        document.getElementById('scheduleModal').style.display = 'none';
+    },
+
+    async _save() {
+        const editId = document.getElementById('editSchedId')?.value || '';
+        const name = document.getElementById('schedNameInput')?.value?.trim();
+        const cron = document.getElementById('schedCronInput')?.value?.trim();
+        const desc = document.getElementById('schedDescInput')?.value?.trim();
+
+        if (!name) { App.showToast('请输入调度名称', 'error'); return; }
+        const isOnce = document.getElementById('schedOnceInput')?.value === 'true';
+        if (!isOnce && !cron) { App.showToast('请输入Cron表达式', 'error'); return; }
+
+        try {
+            const payload = { ...(editId ? { id: editId } : {}), name, desc };
+            if (isOnce) { payload.once = true; } else { payload.cron = cron; }
+            const saved = await Api.saveSchedule(payload);
+            App.showToast(editId ? '调度已更新' : '调度已创建');
+            this._closeModal();
+            this._loadSchedules();
+            if (!editId && saved?.id && typeof this._onScheduleCreated === 'function') {
+                this._onScheduleCreated(saved.id);
+                this._onScheduleCreated = null;
+            }
+        } catch(e) {}
+    },
+
+    async _edit(id) { this._showAddModal(id); },
+
+    async _delete(id) {
+        if (!confirm('确定要删除此调度吗？删除后关联的同步任务将失去定时调度。')) return;
+        try {
+            await Api.deleteSchedule(id);
+            App.showToast('调度已删除');
+            this._loadSchedules();
+        } catch(e) {}
+    },
+
+    async _toggle(id) {
+        const s = this._schedules.find(x => x.id === id);
+        if (!s) return;
+        try {
+            await Api.toggleSchedule(id, !(s.enabled !== false));
+            App.showToast((s.enabled !== false ? '已禁用' : '已启用'));
+            this._loadSchedules();
+        } catch(e) {}
+    },
+
+    async _triggerOnce(id) {
+        const s = this._schedules.find(x => x.id === id);
+        if (!s) return;
+        if (!confirm(`确定要立即执行一次调度「${s.name}」吗？\n将触发该调度关联的所有同步任务。`)) return;
+        try {
+            await Api.triggerSchedule(id);
+            App.showToast(`调度「${s.name}」已触发执行`);
+        } catch(e) {}
+    }
+};
+</script>

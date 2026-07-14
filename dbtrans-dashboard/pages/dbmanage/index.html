@@ -1,0 +1,286 @@
+<div class="page-header">
+    <div class="page-title"><span class="page-title-icon"><span data-icon="database"></span></span>数据库连接管理</div>
+    <div class="page-header-right">
+        <button class="btn btn-primary" onclick="DbManage.openModal()">＋ 新增数据库连接</button>
+    </div>
+</div>
+<div id="dbListContainer" class="db-list">
+    <div style="text-align:center;padding:80px 0;color:var(--text-muted);" id="dbListLoading">
+        <div style="font-size:16px;"><span data-icon="loader"></span> 加载中...</div>
+    </div>
+</div>
+
+<template id="tpl-db-item">
+    <div class="db-item">
+        <div class="db-item-info">
+            <div class="db-type-icon"></div>
+            <div class="db-detail">
+                <h4></h4>
+                <p style="font-family:monospace;font-size:11px;"></p>
+            </div>
+        </div>
+        <div class="db-item-actions">
+            <div class="conn-status"></div>
+            <button class="btn btn-sm btn-test">测试</button>
+            <button class="btn btn-sm btn-edit">编辑</button>
+            <button class="btn btn-sm btn-danger btn-delete">删除</button>
+        </div>
+    </div>
+</template>
+
+<script>
+var DbManage = {
+
+    async render() {
+        const container = document.getElementById('dbListContainer');
+        if (!container) return;
+
+        try {
+            const list = await Api.getDatabases();
+            if (list && list.length > 0) {
+                list.forEach(d => { d.id = String(d.id); });
+                Store.dbConnections = list;
+            }
+        } catch (error) {
+            console.warn('API加载数据库列表失败，使用本地缓存:', error.message);
+        }
+
+        const list = Store.dbConnections;
+
+        if (!list || list.length === 0) {
+            container.innerHTML = `<div style="text-align:center;padding:80px 0;color:var(--text-muted);">
+                <div style="font-size:48px;margin-bottom:16px;"><span data-icon="database"></span></div>
+                <div style="font-size:15px;margin-bottom:8px;">暂无数据库连接</div>
+                <div style="font-size:12px;">点击右上角「新增数据库连接」开始配置</div></div>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        list.forEach(db => container.appendChild(this._buildDbItem(db)));
+    },
+
+    _buildDbItem(db) {
+        const tpl = document.getElementById('tpl-db-item');
+        const clone = tpl.content.firstElementChild.cloneNode(true);
+        const info = DB_TYPE_INFO[db.type] || DB_TYPE_INFO.mysql;
+
+        clone.setAttribute('data-id', db.id);
+        clone.querySelector('.db-type-icon').className = 'db-type-icon ' + info.cssClass;
+        clone.querySelector('.db-type-icon').innerHTML = info.icon;
+        clone.querySelector('.db-detail h4').textContent = db.name;
+        let detailText = info.label + ' | ' + (db.url || '') + ' | 用户: ' + db.user;
+        if (db.remark) detailText += ' | ' + db.remark;
+        clone.querySelector('.db-detail p').textContent = detailText;
+
+        const statusEl = clone.querySelector('.conn-status');
+        statusEl.className = 'conn-status ' + (db.connected ? 'connected' : 'disconnected');
+        statusEl.id = 'conn-status-' + db.id;
+        statusEl.innerHTML = '<div class="conn-dot ' + (db.connected ? 'on' : 'off') + '"></div>' + (db.connected ? '已连接' : '未连接');
+
+        clone.querySelector('.btn-test').onclick = function() { DbManage.testSingle(db.id); };
+        clone.querySelector('.btn-edit').onclick = function() { DbManage.openModal(db.id); };
+        clone.querySelector('.btn-delete').onclick = function() { DbManage.delete(db.id); };
+
+        return clone;
+    },
+
+    openModal(editId) {
+        document.getElementById('dbModalTitle').textContent = editId ? '编辑数据库连接' : '新增数据库连接';
+        document.getElementById('editDbId').value = editId || '';
+
+        if (editId) {
+            const db = Store.dbConnections.find(d => d.id === editId);
+            if (db) this._fillForm(db);
+        } else {
+            this._clearForm();
+        }
+
+        this.onDbTypeChange();
+        document.getElementById('dbTestResult').style.display = 'none';
+        App.openModal('dbModal');
+    },
+
+    _fillForm(db) {
+        document.getElementById('dbName').value = db.name || '';
+        document.getElementById('dbType').value = db.type || 'mysql';
+        const parsed = Utils.parseJdbcUrl(db.type, db.url);
+        document.getElementById('dbHost').value = parsed.host;
+        document.getElementById('dbPort').value = parsed.port;
+        document.getElementById('dbDatabase').value = parsed.database;
+        document.getElementById('dbSchema').value = parsed.schema;
+        document.getElementById('dbUser').value = db.user || '';
+        document.getElementById('dbPassword').value = '******';
+        document.getElementById('dbRemark').value = db.remark || '';
+        this._updateUrlPreview();
+    },
+
+    _clearForm() {
+        ['dbName','dbType','dbHost','dbPort','dbDatabase','dbSchema','dbUser','dbPassword','dbRemark'].forEach(id => {
+            document.getElementById(id).value = id === 'dbType' ? 'mysql' : '';
+        });
+    },
+
+    onDbTypeChange() {
+        const type = document.getElementById('dbType').value;
+        const cfg = Utils.DB_CONFIGS[type];
+        if (!cfg) return;
+
+        const dbGroup = document.getElementById('dbDatabaseGroup');
+        const schemaGroup = document.getElementById('dbSchemaGroup');
+        const dbLabel = document.getElementById('dbDatabaseLabel');
+
+        if (cfg.showDatabase) {
+            dbGroup.style.display = '';
+            dbLabel.textContent = type === 'oracle' ? 'SID/服务名 *' : '数据库名 *';
+        } else {
+            dbGroup.style.display = 'none';
+        }
+        schemaGroup.style.display = cfg.showSchema ? '' : 'none';
+
+        if (!document.getElementById('editDbId').value) {
+            document.getElementById('dbPort').value = cfg.defaultPort;
+        }
+        this._updateUrlPreview();
+    },
+
+    _updateUrlPreview() {
+        const type = document.getElementById('dbType').value;
+        const host = document.getElementById('dbHost').value.trim();
+        const port = document.getElementById('dbPort').value.trim();
+        const database = document.getElementById('dbDatabase').value.trim();
+        const schema = document.getElementById('dbSchema').value.trim();
+        document.getElementById('dbUrlPreview').value = Utils.buildJdbcUrl(type, host, port, database, schema);
+    },
+
+    async testConnection() {
+        const editId = document.getElementById('editDbId').value;
+        const type = document.getElementById('dbType').value;
+        const host = document.getElementById('dbHost').value.trim();
+        const port = document.getElementById('dbPort').value.trim();
+        const database = document.getElementById('dbDatabase').value.trim();
+        const schema = document.getElementById('dbSchema').value.trim();
+        const user = document.getElementById('dbUser').value.trim();
+        const password = document.getElementById('dbPassword').value;
+        const resEl = document.getElementById('dbTestResult');
+
+        if (editId && password === '******') {
+            resEl.innerHTML = Icons.loader() + ' 正在测试连接...';
+            resEl.className = 'test-result';
+            resEl.style.display = 'block';
+            try {
+                const result = await Api.testConnection({ id: editId });
+                resEl.innerHTML = result.connected
+                    ? Icons.check() + ` 连接成功 (${result.latency_ms}ms, 版本: ${result.version})`
+                    : Icons.x() + ` 连接失败: ${result.error || '未知错误'}`;
+                resEl.className = 'test-result' + (result.connected ? '' : ' error');
+                this._updateConnStatus(editId, result.connected);
+            } catch (error) {
+                resEl.innerHTML = Icons.x() + ` 测试失败: ${error.message}`;
+                resEl.className = 'test-result error';
+                this._updateConnStatus(editId, false);
+            }
+            return;
+        }
+
+        if (!host || !port || !user || !password) {
+            resEl.textContent = '请填写完整连接信息（主机、端口、用户名、密码）';
+            resEl.className = 'test-result error';
+            resEl.style.display = 'block';
+            return;
+        }
+
+        resEl.innerHTML = Icons.loader() + ' 正在测试连接...';
+        resEl.className = 'test-result';
+        resEl.style.display = 'block';
+
+        const url = Utils.buildJdbcUrl(type, host, port, database, schema);
+        try {
+            const result = await Api.testConnection({ type, url, user, password });
+            resEl.innerHTML = result.connected
+                ? Icons.check() + ` 连接成功 (${result.latency_ms}ms, 版本: ${result.version})`
+                : Icons.x() + ` 连接失败: ${result.error || '未知错误'}`;
+            resEl.className = 'test-result' + (result.connected ? '' : ' error');
+        } catch (error) {
+            resEl.innerHTML = Icons.x() + ` 测试失败: ${error.message}`;
+            resEl.className = 'test-result error';
+        }
+    },
+
+    async testSingle(id) {
+        const db = Store.dbConnections.find(d => d.id === id);
+        if (!db) return;
+        App.showToast(`正在测试 ${db.name} ...`, 'success');
+        try {
+            const result = await Api.testConnection({ id });
+            App.showToast(result.connected ? `${db.name} 连接成功 (${result.latency_ms}ms)` : `${db.name} 连接失败: ${result.error}`, result.connected ? 'success' : 'error');
+            this._updateConnStatus(id, result.connected);
+        } catch (error) {
+            App.showToast(`测试失败: ${error.message}`, 'error');
+            this._updateConnStatus(id, false);
+        }
+    },
+
+    _updateConnStatus(id, connected) {
+        const db = Store.dbConnections.find(d => d.id === id);
+        if (db) db.connected = connected;
+        const statusEl = document.getElementById('conn-status-' + id);
+        if (statusEl) {
+            statusEl.className = 'conn-status ' + (connected ? 'connected' : 'disconnected');
+            statusEl.innerHTML = '<div class="conn-dot ' + (connected ? 'on' : 'off') + '"></div>' + (connected ? '已连接' : '未连接');
+        }
+    },
+
+    async delete(id) {
+        if (!confirm('确定要删除此数据库连接吗？')) return;
+        try {
+            await Api.deleteDatabase(id);
+            Store.dbConnections = Store.dbConnections.filter(d => d.id !== id);
+            this.render();
+            if (typeof Config !== 'undefined') Config.refreshDbSelects();
+            App.showToast('已删除数据库连接');
+        } catch (error) {}
+    },
+
+    async save() {
+        const editId = document.getElementById('editDbId').value;
+        const name = document.getElementById('dbName').value.trim();
+        const type = document.getElementById('dbType').value;
+        const host = document.getElementById('dbHost').value.trim();
+        const port = document.getElementById('dbPort').value.trim();
+        const database = document.getElementById('dbDatabase').value.trim();
+        const schema = document.getElementById('dbSchema').value.trim();
+        const user = document.getElementById('dbUser').value.trim();
+        const password = document.getElementById('dbPassword').value;
+        const remark = document.getElementById('dbRemark').value.trim();
+
+        if (!name || !host || !port || !user || !password) {
+            App.showToast('请填写必填字段', 'error'); return;
+        }
+
+        const url = Utils.buildJdbcUrl(type, host, port, database, schema);
+        const dbData = {
+            id: editId || undefined,
+            name, type, url, user,
+            password: password === '******' ? undefined : password,
+            remark
+        };
+
+        try {
+            await Api.saveDatabase(dbData);
+            App.closeModal('dbModal');
+            await this.render();
+            if (typeof Config !== 'undefined') Config.refreshDbSelects();
+            App.showSaveIndicator();
+            App.showToast(editId ? '连接已更新' : '数据库连接已保存');
+        } catch (error) {}
+    }
+};
+
+// 绑定实时预览事件
+document.addEventListener('DOMContentLoaded', () => {
+    ['dbHost', 'dbPort', 'dbDatabase', 'dbSchema'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => DbManage._updateUrlPreview());
+    });
+});
+</script>

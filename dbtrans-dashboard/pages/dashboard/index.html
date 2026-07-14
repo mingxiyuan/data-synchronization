@@ -1,0 +1,103 @@
+<div class="page-header">
+    <div class="page-title">
+        <span class="page-title-icon"><span data-icon="check"></span></span>
+        实时同步看板
+    </div>
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-primary)"></div>吞吐量 (RPS)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--accent-yellow)"></div>延迟 (ms)</div>
+    </div>
+</div>
+
+<div class="dash-stats">
+    <div class="dash-stat">
+        <div class="dash-stat-label">当前吞吐量</div>
+        <div class="dash-stat-value" id="dashRps"><span class="dash-stat-num">--</span><span class="dash-stat-unit">RPS</span></div>
+        <div class="dash-stat-extra"><span class="trend-up">--</span></div>
+    </div>
+    <div class="dash-stat">
+        <div class="dash-stat-label">同步延迟</div>
+        <div class="dash-stat-value" id="dashLatency"><span class="dash-stat-num">--</span><span class="dash-stat-unit">MS</span></div>
+        <div class="dash-stat-extra"><span class="trend-stable" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:12px;background:var(--accent-green-soft);color:var(--accent-green);">--</span></div>
+    </div>
+    <div class="dash-stat">
+        <div class="dash-stat-label">今日同步行数</div>
+        <div class="dash-stat-value" id="dashRows"><span class="dash-stat-num">--</span><span class="dash-stat-unit"></span></div>
+        <div class="dash-stat-extra"><span>任务时长: --</span></div>
+    </div>
+    <div class="dash-stat">
+        <div class="dash-stat-label">读写带宽</div>
+        <div class="dash-stat-value" id="dashBw"><span class="dash-stat-num">--</span><span class="dash-stat-unit">MB/S</span></div>
+        <div class="dash-stat-extra"><div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div></div>
+    </div>
+</div>
+
+<div class="charts-row">
+    <div class="chart-card">
+        <div class="chart-header">
+            <span class="chart-title">性能曲线 (最近30分钟)</span>
+            <select class="chart-select" onchange="Dashboard.changeRefreshRate(this.value)">
+                <option value="5">5秒刷新</option><option value="10" selected>10秒刷新</option><option value="30">30秒刷新</option>
+            </select>
+        </div>
+        <div class="chart-wrapper"><canvas id="perfChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <span class="chart-title">同步对象分析</span>
+        </div>
+        <div class="chart-wrapper"><canvas id="pieChart"></canvas></div>
+    </div>
+</div>
+
+<div class="bottom-bar">
+    <div class="bottom-card">
+        <div class="bottom-info-row"><span class="bottom-label">全量完成度</span><span class="bottom-value value-blue" id="dashFullSync">--</span></div>
+    </div>
+    <div class="bottom-card">
+        <div class="bottom-info-row"><span class="bottom-label">增量捕获 (CDC)</span><span class="bottom-value value-green" id="dashCdcStatus">--</span></div>
+    </div>
+</div>
+
+<div class="bottom-card" style="margin-top:16px;">
+    <div class="chart-header" style="margin-bottom:12px;">
+        <span class="chart-title">增量更新流水</span>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);" id="dashCdcInfo">
+        系统运行正常，当前无积压数据。最近一次CDC事件: users表 INSERT操作 (09:30:08)
+    </div>
+</div>
+
+<div class="dash-stats" style="margin-top:16px;grid-template-columns:repeat(4,1fr);">
+    <div class="dash-stat">
+        <div class="dash-stat-label">同步线程池</div>
+        <div class="dash-stat-value"><span class="dash-stat-num" id="dashSyncThreads">-</span><span class="dash-stat-unit">活跃/总数</span></div>
+    </div>
+    <div class="dash-stat">
+        <div class="dash-stat-label">入库线程池</div>
+        <div class="dash-stat-value"><span class="dash-stat-num" id="dashMergeThreads">-</span><span class="dash-stat-unit">活跃/总数</span></div>
+    </div>
+    <div class="dash-stat">
+        <div class="dash-stat-label">同步队列</div>
+        <div class="dash-stat-value"><span class="dash-stat-num" id="dashSyncQueue">-</span><span class="dash-stat-unit">待处理</span></div>
+    </div>
+    <div class="dash-stat">
+        <div class="dash-stat-label">今日成功率</div>
+        <div class="dash-stat-value"><span class="dash-stat-num" id="dashTodayRate">-</span></div>
+    </div>
+</div>
+
+<div id="dashProgressCard" class="bottom-card" style="margin-top:16px;display:none;">
+    <div class="chart-header" style="margin-bottom:12px;">
+        <span class="chart-title">同步进度</span>
+        <span id="dashProgressTaskName" style="font-size:12px;color:var(--text-muted);"></span>
+    </div>
+    <div class="progress-bar" style="height:24px;border-radius:6px;margin-bottom:8px;">
+        <div class="progress-fill" id="dashProgressBar" style="width:0%;background:var(--accent-primary);border-radius:6px;transition:width .5s;"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);">
+        <span id="dashProgressText">0 / 0</span>
+        <span id="dashProgressEta">--</span>
+    </div>
+</div>
+

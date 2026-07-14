@@ -1,0 +1,317 @@
+<div class="page-header">
+    <div class="page-title"><span class="page-title-icon"><span data-icon="zap"></span></span>同步配置</div>
+    <div class="page-header-right">
+        <select class="chart-select" id="sourceDbSelect" style="width:auto;" onchange="Config.onSourceDbChange()">
+            <option value="">选择数据源库...</option>
+        </select>
+        <select class="chart-select" id="targetDbSelect" style="width:auto;" onchange="Config.onTargetDbChange()">
+            <option value="">选择目标库...</option>
+        </select>
+    </div>
+</div>
+<div class="config-grid" id="configDbGrid">
+    <div class="config-panel" id="sourceDbPanel">
+        <div class="panel-header">
+            <div class="panel-title"><span class="panel-icon" id="srcPanelIcon" data-db-icon="mysql"></span> 数据源 <span style="font-size:12px;color:var(--text-muted)" id="srcDbTypeLabel">(未选择)</span></div>
+            <div class="conn-status disconnected" id="srcConnStatus"><div class="conn-dot off"></div> 未连接</div>
+        </div>
+        <div id="sourceDbFormArea">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">请先在「数据库管理」页面添加数据源库，然后在此处选择。</p>
+        </div>
+    </div>
+    <div class="config-panel" id="targetDbPanel">
+        <div class="panel-header">
+            <div class="panel-title"><span class="panel-icon" id="tgtPanelIcon" data-db-icon="postgresql"></span> 字段关联 <span style="font-size:12px;color:var(--text-muted)" id="tgtDbTypeLabel">(未选择)</span></div>
+            <div class="conn-status disconnected" id="tgtConnStatus"><div class="conn-dot off"></div> 未连接</div>
+        </div>
+        <div id="targetDbFormArea">
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">请先在「数据库管理」页面添加目标库，然后在此处选择。</p>
+        </div>
+    </div>
+</div>
+<div class="sync-tasks-section" id="syncTasksSection">
+    <div class="mapping-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span class="mapping-title" id="taskListTitle">已配置的同步任务</span>
+            <span class="detail-link" id="taskListBack" style="display:none;" onclick="Config._backToGroupList()">&larr; 返回分组列表</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" class="form-input" placeholder="搜索任务名称..." id="taskSearchInput" oninput="Config._onTaskSearch(this.value)" style="width:200px;padding:6px 12px;font-size:12px;">
+            <button class="btn btn-sm" onclick="Config._batchQuerySourceMax()" style="font-size:11px;">查询全部源表最新</button>
+            <button class="btn btn-sm btn-primary" onclick="Config._refreshTaskList()"><span data-icon="refresh"></span> 刷新</button>
+        </div>
+    </div>
+    <div id="groupFolderView"></div>
+    <div class="table-container" id="groupTaskTableView" style="display:none;">
+        <table>
+            <thead><tr>
+                <th>源表</th><th>目标表</th><th>策略</th><th>调度</th><th>增量字段</th><th>同步至</th><th>源表最新</th><th>映射数</th><th>状态</th><th>操作</th>
+            </tr></thead>
+            <tbody id="syncTaskBody">
+                <tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted)">加载中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 分组编辑模态框 -->
+<div class="modal-overlay" id="groupEditModal" style="display:none;">
+    <div class="modal" style="max-width:420px;">
+        <div class="modal-header">
+            <span class="modal-title">设置分组</span>
+            <button class="modal-close" onclick="Config._closeGroupModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom:12px;font-size:13px;" id="groupModalInfo"></div>
+            <input type="hidden" id="groupModalTaskId">
+            <div class="form-group">
+                <label class="form-label">选择已有分组</label>
+                <select class="form-select" id="groupModalSelect" onchange="Config._onGroupModalSelectChange()">
+                    <option value="">-- 不分组 --</option>
+                </select>
+            </div>
+            <div style="text-align:center;margin:8px 0;font-size:12px;color:var(--text-muted);">—— 或者 ——</div>
+            <div class="form-group">
+                <label class="form-label">新建分组</label>
+                <input class="form-input" id="groupModalInput" placeholder="输入新分组名称">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="Config._closeGroupModal()">取消</button>
+            <button class="btn btn-primary" onclick="Config._saveGroupModal()">确定</button>
+        </div>
+    </div>
+</div>
+
+<!-- 源表选择器模板（SQL模式） -->
+<template id="tpl-source-sql-mode">
+    <div class="source-mode-toggle">
+    <label><input type="radio" name="sourceMode" value="table" onchange="Config._onSourceModeChange('table')"><span> <span data-icon="file-text"></span> 数据库表</span></label>
+        <label><input type="radio" name="sourceMode" value="sql" checked onchange="Config._onSourceModeChange('sql')"><span> <span data-icon="edit"></span> 自定义SQL</span></label>
+    </div>
+    <div id="sourceTableModeArea" style="display:none">
+        <div id="srcTableComboboxWrap"></div>
+    </div>
+    <div id="sourceSqlModeArea">
+        <div class="sql-name-row">
+            <div class="form-group">
+                <label class="form-label" style="margin-bottom:4px">源表名称 *</label>
+                <input class="form-input" id="srcSqlName" placeholder="为自定义SQL命名（如: user_order_view）">
+            </div>
+        </div>
+        <div class="sql-editor-section">
+            <div class="sql-editor-wrap">
+                <div class="sql-editor-toolbar">
+                    <span style="color:var(--text-muted)">SQL 编辑器</span>
+                    <div class="sql-toolbar-btns">
+                        <button class="btn btn-sm" onclick="Config._formatSql()" title="格式化SQL"><span data-icon="format"></span> 格式化</button>
+                        <button class="btn btn-sm btn-primary" onclick="Config._parseSqlColumns()" title="解析SQL字段"><span data-icon="search"></span> 解析字段</button>
+                        <button class="btn btn-sm" onclick="Config._previewSql()" title="查看完整SQL(含增量条件)"><span data-icon="eye"></span> 查看SQL</button>
+                        <button class="btn btn-sm btn-primary" onclick="Config._testSql()" title="连接源库测试执行"><span data-icon="play"></span> 测试执行</button>
+                    </div>
+                </div>
+                <textarea id="srcSqlEditor"></textarea>
+            </div>
+            <div class="sql-parsed-info" id="sqlParsedInfo" style="display:none;"></div>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="form-label">目标表 *</label>
+        <div id="tgtTableComboboxWrap"></div>
+    </div>
+    <div class="form-group">
+        <label class="form-label">同步数据策略</label>
+        <select class="form-select" id="syncStrategySelect" onchange="Config._onStrategyChange()">
+            <option value="incremental">增量同步 (基于时间戳/ID增量)</option>
+            <option value="full">全量同步 (全表覆盖)</option>
+            <option value="cdc">CDC 实时捕获 (Change Data Capture)</option>
+        </select>
+        <label class="no-update-check" style="margin-top:8px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+            <input type="checkbox" id="noUpdateCheck" onchange="Config._onNoUpdateChange()">
+            <span>不执行实际更新（仅插入）</span>
+        </label>
+        <div style="margin-top:8px;">
+            <label class="form-label" style="font-size:12px;">读取模式</label>
+            <select class="form-select" id="fetchModeSelect">
+                <option value="parallel">并行分页 (有索引时推荐)</option>
+                <option value="streaming">流式读取 (无索引时推荐)</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-group" id="incrementFieldGroup">
+        <label class="form-label">增量基准字段</label>
+        <select class="form-select" id="incrFieldSelect">
+            <option value="">-- 选择增量字段 --</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">执行调度 <span style="font-size:11px;color:var(--text-muted)">(选择调度规则)</span></label>
+        <div style="display:flex;gap:8px;">
+            <select class="form-select" id="syncScheduleSelect" style="flex:1;">
+                <option value="">-- 选择或创建调度 --</option>
+            </select>
+            <button class="btn btn-sm" onclick="Config._goToSchedulePage()" title="跳转调度管理创建新调度">+ 新建</button>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="form-label">任务分组</label>
+        <div style="display:flex;gap:8px;">
+            <select class="form-select" id="taskGroupSelect" style="flex:1;" onchange="Config._onTaskGroupSelectChange()">
+                <option value="">-- 不分组 --</option>
+            </select>
+            <input class="form-input" id="taskGroupInput" placeholder="或输入新分组名称" style="flex:1;display:none;">
+        </div>
+    </div>
+</template>
+
+<!-- 源表选择器模板（表模式） -->
+<template id="tpl-source-table-mode">
+    <div class="source-mode-toggle">
+        <label><input type="radio" name="sourceMode" value="table" checked onchange="Config._onSourceModeChange('table')"><span> <span data-icon="file-text"></span> 数据库表</span></label>
+        <label><input type="radio" name="sourceMode" value="sql" onchange="Config._onSourceModeChange('sql')"><span> <span data-icon="edit"></span> 自定义SQL</span></label>
+    </div>
+    <div id="sourceTableModeArea">
+        <div id="srcTableComboboxWrap"></div>
+    </div>
+    <div id="sourceSqlModeArea" style="display:none">
+        <div class="sql-name-row">
+            <div class="form-group">
+                <label class="form-label" style="margin-bottom:4px">源表名称 *</label>
+                <input class="form-input" id="srcSqlName" placeholder="为自定义SQL命名（如: user_order_view）">
+            </div>
+        </div>
+        <div class="sql-editor-section">
+            <div class="sql-editor-wrap">
+                <div class="sql-editor-toolbar">
+                    <span style="color:var(--text-muted)">SQL 编辑器</span>
+                    <div class="sql-toolbar-btns">
+                        <button class="btn btn-sm" onclick="Config._formatSql()" title="格式化SQL"><span data-icon="format"></span> 格式化</button>
+                        <button class="btn btn-sm btn-primary" onclick="Config._parseSqlColumns()" title="解析SQL字段"><span data-icon="search"></span> 解析字段</button>
+                        <button class="btn btn-sm" onclick="Config._previewSql()" title="查看完整SQL(含增量条件)"><span data-icon="eye"></span> 查看SQL</button>
+                        <button class="btn btn-sm btn-primary" onclick="Config._testSql()" title="连接源库测试执行"><span data-icon="play"></span> 测试执行</button>
+                    </div>
+                </div>
+                <textarea id="srcSqlEditor"></textarea>
+            </div>
+            <div class="sql-parsed-info" id="sqlParsedInfo" style="display:none;"></div>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="form-label">目标表 *</label>
+        <div id="tgtTableComboboxWrap"></div>
+    </div>
+    <div class="form-group">
+        <label class="form-label">同步数据策略</label>
+        <select class="form-select" id="syncStrategySelect" onchange="Config._onStrategyChange()">
+            <option value="incremental">增量同步 (基于时间戳/ID增量)</option>
+            <option value="full">全量同步 (全表覆盖)</option>
+            <option value="cdc">CDC 实时捕获 (Change Data Capture)</option>
+        </select>
+        <label class="no-update-check" style="margin-top:8px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+            <input type="checkbox" id="noUpdateCheck" onchange="Config._onNoUpdateChange()">
+            <span>不执行实际更新（仅插入）</span>
+        </label>
+        <div style="margin-top:8px;">
+            <label class="form-label" style="font-size:12px;">读取模式</label>
+            <select class="form-select" id="fetchModeSelect">
+                <option value="parallel">并行分页 (有索引时推荐)</option>
+                <option value="streaming">流式读取 (无索引时推荐)</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-group" id="incrementFieldGroup">
+        <label class="form-label">增量基准字段</label>
+        <select class="form-select" id="incrFieldSelect">
+            <option value="">-- 选择增量字段 --</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">执行调度 <span style="font-size:11px;color:var(--text-muted)">(选择调度规则)</span></label>
+        <div style="display:flex;gap:8px;">
+            <select class="form-select" id="syncScheduleSelect" style="flex:1;">
+                <option value="">-- 选择或创建调度 --</option>
+            </select>
+            <button class="btn btn-sm" onclick="Config._goToSchedulePage()" title="跳转调度管理创建新调度">+ 新建</button>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="form-label">任务分组</label>
+        <div style="display:flex;gap:8px;">
+            <select class="form-select" id="taskGroupSelect" style="flex:1;" onchange="Config._onTaskGroupSelectChange()">
+                <option value="">-- 不分组 --</option>
+            </select>
+            <input class="form-input" id="taskGroupInput" placeholder="或输入新分组名称" style="flex:1;display:none;">
+        </div>
+    </div>
+</template>
+
+<!-- 字段映射行模板 -->
+<template id="tpl-field-mapping-row">
+    <tr class="field-map-row">
+        <td style="padding:6px 10px !important;vertical-align:middle">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <select class="form-select field-src-select" onchange="Config._onSrcFieldChange(this)">
+                    <option value="">-- 选择源字段 --</option>
+                </select>
+                <span class="field-type-tag field-src-type"></span>
+            </div>
+        </td>
+        <td class="field-arrow-cell">→</td>
+        <td style="padding:6px 10px !important;vertical-align:middle">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <select class="form-select field-tgt-select" onchange="Config._onTgtFieldChange(this)">
+                    <option value="">-- 不映射 --</option>
+                </select>
+                <span class="field-type-tag tgt field-tgt-type"></span>
+            </div>
+        </td>
+        <td class="field-pk-cell">
+            <label class="pk-checkbox-wrap" title="勾选作为主键，相同主键执行UPDATE">
+                <input type="checkbox" class="pk-checkbox" onchange="Config._onPkChange(this)" />
+                <span class="pk-indicator"><span data-icon="key"></span></span>
+            </label>
+        </td>
+        <td class="field-action-cell">
+            <button class="field-del-btn" onclick="Config._removeMappingRow(this)" title="删除此行"><span data-icon="x"></span></button>
+        </td>
+    </tr>
+</template>
+
+<!-- 任务行模板 -->
+<template id="tpl-task-row">
+    <tr>
+        <td><span class="db-badge src task-src-badge"></span><span class="task-sql-badge" style="font-size:10px;color:var(--accent-purple);background:rgba(155,133,247,.12);padding:1px 6px;border-radius:3px;margin-left:4px;display:none;">SQL</span></td>
+        <td><span class="db-badge tgt task-tgt-badge"></span></td>
+        <td><span class="sync-strategy task-strategy"></span><span class="fetch-mode-badge task-fetch-mode" style="margin-left:4px;font-size:10px;"></span></td>
+        <td class="task-sched-name">-</td>
+        <td class="task-incr-field">-</td>
+        <td class="task-last-marker" style="font-size:12px;">-</td>
+        <td class="task-source-max" style="font-size:12px;">-</td>
+        <td class="task-mapping-count"></td>
+        <td class="task-status-td"></td>
+        <td>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-edit-task" style="font-size:11px;">编辑</button>
+                <button class="btn btn-sm btn-danger btn-del-task" style="font-size:11px;">删除</button>
+                <button class="btn btn-sm btn-group-task" style="font-size:11px;">分组</button>
+                <button class="btn btn-sm btn-source-max" style="font-size:11px;">查最新</button>
+                <button class="btn btn-sm btn-edit-marker" style="font-size:11px;">修改同步至</button>
+                <button class="btn btn-sm btn-progress" style="font-size:11px;display:none;">进度</button>
+                <button class="btn btn-sm btn-success btn-start-task" style="font-size:11px;display:none;">启动</button>
+                <button class="btn btn-sm btn-stop-task" style="font-size:11px;display:none;">停止</button>
+                <button class="btn btn-sm btn-pause-task" style="font-size:11px;background:var(--accent-yellow);border-color:var(--accent-yellow);color:#fff;display:none;">暂停</button>
+            </div>
+        </td>
+    </tr>
+</template>
+
+<!-- 文件夹卡片模板 -->
+<template id="tpl-folder-card">
+    <div class="group-folder-card">
+        <div class="group-folder-icon"><span data-icon="folder"></span></div>
+        <div class="group-folder-name"></div>
+        <div class="group-folder-meta"></div>
+        <div class="group-folder-stats" style="margin-top:8px;font-size:11px;color:var(--text-muted);"></div>
+    </div>
+</template>
+

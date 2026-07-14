@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DBTrans v3.6.0 - 数据同步管理系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- CodeMirror 5 for SQL Editor -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/eclipse.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/sql-hint.min.js"></script>
+    <!-- SQL Formatter -->
+    <script src="https://cdn.jsdelivr.net/npm/sql-formatter@12.2.1/dist/sql-formatter.min.js"></script>
+</head>
+<body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="appSidebar">
+        <div class="sidebar-item" onclick="App.switchPage('dbmanage')" title="数据库管理" id="nav-dbmanage"><span data-icon="database"></span><span class="nav-label">数据库管理</span></div>
+        <div class="sidebar-item" onclick="App.switchPage('config')" title="同步配置" id="nav-config"><span data-icon="sliders"></span><span class="nav-label">同步配置</span></div>
+        <div class="sidebar-item" onclick="App.switchPage('schedules')" title="调度管理" id="nav-schedules"><span data-icon="clock"></span><span class="nav-label">调度管理</span></div>
+        <div class="sidebar-item active" onclick="App.switchPage('dashboard')" title="实时监控" id="nav-monitor"><span data-icon="activity"></span><span class="nav-label">实时监控</span></div>
+        <div class="sidebar-item" onclick="App.switchPage('logs')" title="日志" id="nav-logs"><span data-icon="file-text"></span><span class="nav-label">任务日志</span></div>
+        <div class="sidebar-bottom">
+            <div class="sidebar-item" title="帮助"><span data-icon="help-circle"></span><span class="nav-label">帮助</span></div>
+            <div id="navUserArea" class="sidebar-user-area">
+                <div class="avatar" title="管理员">U</div>
+                <span class="sidebar-username" id="navUserName">管理员</span>
+            </div>
+            <div class="sidebar-item" onclick="App.logout()" title="退出登录"><span data-icon="log-out"></span><span class="nav-label">退出登录</span></div>
+            <div class="sidebar-toggle" onclick="App.toggleSidebar()" title="收起菜单"><span data-icon="chevron-right"></span><span class="nav-label">收起菜单</span></div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <div class="logo-icon">D</div>
+                    <span class="logo-text">DBTrans</span>
+                    <span class="logo-version">v3.6.0</span>
+                </div>
+                <span class="header-label">当前任务:</span>
+                <span class="task-name" id="currentTaskName">User_Profile_Sync_20260414</span>
+            </div>
+            <div class="header-right">
+                <div class="status-badge"><div class="status-dot"></div> 正在运行</div>
+                <span class="update-time" id="updateTime">更新时间: 2026-04-15 09:30:00</span>
+                <div class="save-indicator" id="saveIndicator"><span data-icon="check"></span> 已自动保存</div>
+                <div class="header-actions">
+                    <button class="icon-btn" onclick="App.switchPage('dashboard')"><span data-icon="monitor"></span></button>
+                    <button class="icon-btn"><span data-icon="settings"></span></button>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-content" id="appPages">
+
+            <!-- Dashboard Page -->
+            <section class="page-tabs active" id="page-login"></section>
+            <section class="page-tabs" id="page-dashboard"></section>
+
+            <!-- DB Management Page -->
+            <section class="page-tabs" id="page-dbmanage"></section>
+
+            <!-- Config Page -->
+            <section class="page-tabs" id="page-config"></section>
+
+            <!-- Schedules Page -->
+            <section class="page-tabs" id="page-schedules"></section>
+
+            <!-- Logs Page -->
+            <section class="page-tabs" id="page-logs"></section>
+
+            <!-- Log Detail Page -->
+            <section class="page-tabs" id="page-log-detail"></section>
+
+        </div>
+
+        <footer class="app-footer">
+            <span>v3.6.0 | 安全连接已启用</span>
+            <span>&copy; 2026 DBTrans Intelligent Sync Engine</span>
+        </footer>
+    </main>
+
+    <!-- Modal: Add/Edit Database Connection -->
+    <div class="modal-overlay" id="dbModal">
+        <div class="modal modal-db">
+            <div class="modal-header">
+                <span class="modal-title" id="dbModalTitle">新增数据库连接</span>
+                <button class="modal-close" onclick="App.closeModal('dbModal')"><span data-icon="x"></span></button>
+            </div>
+            <div class="modal-body" id="dbModalBody">
+                <input type="hidden" id="editDbId">
+                <div class="form-group">
+                    <label class="form-label">连接名称 *</label>
+                    <input class="form-input" id="dbName" placeholder="例: 生产环境MySQL主库">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">数据库类型 *</label>
+                    <select class="form-select" id="dbType" onchange="DbManage.onDbTypeChange()">
+                        <option value="mysql">MySQL</option>
+                        <option value="postgresql">PostgreSQL</option>
+                        <option value="oracle">Oracle</option>
+                        <option value="sqlserver">SQL Server</option>
+                        <option value="mongodb">MongoDB</option>
+                        <option value="dm">DM(达梦)</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:2">
+                        <label class="form-label">主机地址 *</label>
+                        <input class="form-input" id="dbHost" placeholder="例: 10.24.128.56">
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">端口 *</label>
+                        <input class="form-input" id="dbPort" placeholder="3306">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" id="dbDatabaseGroup">
+                        <label class="form-label" id="dbDatabaseLabel">数据库名 *</label>
+                        <input class="form-input" id="dbDatabase" placeholder="数据库名称">
+                    </div>
+                    <div class="form-group" id="dbSchemaGroup" style="display:none;">
+                        <label class="form-label">模式名 (Schema)</label>
+                        <input class="form-input" id="dbSchema" placeholder="例: YSP">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">JDBC URL 预览</label>
+                    <input class="form-input" id="dbUrlPreview" readonly style="background:var(--bg-secondary);cursor:not-allowed;font-family:monospace;font-size:12px;color:var(--text-muted);">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">用户名 *</label>
+                        <input class="form-input" id="dbUser" placeholder="登录用户名">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">密码 *</label>
+                        <input class="form-input" id="dbPassword" type="password" placeholder="登录密码">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:8px;">
+                    <label class="form-label">备注</label>
+                    <input class="form-input" id="dbRemark" placeholder="可选备注信息">
+                </div>
+                <button class="btn btn-test-conn" onclick="DbManage.testConnection()"><span data-icon="lock"></span> 测试连通性</button>
+                <div class="test-result" id="dbTestResult" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="App.closeModal('dbModal')">取消</button>
+                <button class="btn btn-primary" onclick="DbManage.save()">保存连接</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add/Edit Mapping Rule -->
+    <div class="modal-overlay" id="mappingModal">
+        <div class="modal modal-mapping">
+            <div class="modal-header">
+                <span class="modal-title" id="mappingModalTitle">添加映射规则</span>
+                <button class="modal-close" onclick="App.closeModal('mappingModal')"><span data-icon="x"></span></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editMappingId">
+                <div class="form-group">
+                    <label class="form-label">源表 *</label>
+                    <select class="form-select" id="mapSrcTable">
+                        <option value="">-- 请先选择源表 --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">目标表 *</label>
+                    <input class="form-input" id="mapTgtTable" placeholder="输入目标表名">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">数据策略 *</label>
+                        <select class="form-select" id="mapStrategy">
+                            <option value="incremental">增量同步 (基于时间戳/ID增量)</option>
+                            <option value="full">全量同步 (全表覆盖)</option>
+                            <option value="cdc">CDC 实时捕获 (Change Data Capture)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">同步方向</label>
+                        <select class="form-select" id="mapDirection">
+                            <option value="forward">正向 (源→目标)</option>
+                            <option value="bidirectional">双向同步</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">过滤条件 (可选, WHERE子句)</label>
+                    <input class="form-input" id="mapFilter" placeholder="例: dt >= '2026-01-01' AND status = 1">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="App.closeModal('mappingModal')">取消</button>
+                <button class="btn btn-primary" onclick="Config.saveMapping()">保存规则</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS Modules (order matters) -->
+    <script src="js/icons.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/crypto.js"></script>
+    <script src="js/api.js"></script>
+    <script src="pages/config/config.js"></script>
+    <script src="pages/dashboard/dashboard.js"></script>
+    <script src="pages/logs/logs.js"></script>
+    <script src="pages/logs/log-detail.js"></script>
+    <script src="js/init.js"></script>
+</body>
+</html>

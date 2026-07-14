@@ -1,0 +1,20 @@
+<div style="display:flex;align-items:center;justify-content:center;min-height:80vh;">
+    <div style="width:360px;padding:40px 32px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;">
+        <div style="text-align:center;margin-bottom:28px;">
+            <h2 style="margin:0;font-size:20px;">DBTrans 数据同步平台</h2>
+            <p style="margin:8px 0 0;font-size:13px;color:var(--text-muted);">请登录后使用</p>
+        </div>
+        <div class="form-group">
+            <label class="form-label">用户名</label>
+            <input class="form-input" id="loginUsername" placeholder="请输入用户名" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div class="form-group">
+            <label class="form-label">密码</label>
+            <input class="form-input" id="loginPassword" type="password" placeholder="请输入密码" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div id="loginError" style="display:none;color:var(--accent-red);font-size:12px;margin-bottom:8px;"></div>
+        <button class="btn btn-primary" onclick="Login.doLogin()" style="width:100%;padding:10px;">登 录</button>
+    </div>
+</div>
+
+<script src="pages/login/login.js"></script>
