@@ -1,0 +1,11 @@
+# 本地开发示例模板（此文件可安全提交，不含真实凭据）
+# 复制为 application-dev.properties 并填入你的本地/开发库信息:
+#   cp application-dev.properties.example application-dev.properties
+spring.datasource.url=jdbc:oracle:thin:@localhost:1521/orcl
+spring.datasource.driverClassName=oracle.jdbc.OracleDriver
+spring.datasource.username=your_user
+spring.datasource.password=your_password
+
+eureka.client.enabled=false
+eureka.client.register-with-eureka=false
+eureka.client.fetch-registry=false

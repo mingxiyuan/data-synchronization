@@ -1,0 +1,13 @@
+# IDE
+.idea/
+*.iml
+
+# 构建产物
+transdb/target/
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 本地环境配置（含生产凭据占位，禁止提交真实值；请复制 .example 文件后本地填写）
+transdb/src/main/resources/application-dev.properties
