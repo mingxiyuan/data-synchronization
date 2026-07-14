@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.scxd.mapper.SyncUserMapper">
+
+    <resultMap id="syncUserResult" type="com.trans.model.entity.SyncUser">
+        <id property="id" column="ID"/>
+        <result property="username" column="USERNAME"/>
+        <result property="password" column="PASSWORD"/>
+        <result property="realName" column="REAL_NAME"/>
+        <result property="role" column="ROLE"/>
+        <result property="status" column="STATUS"/>
+        <result property="createTime" column="CREATE_TIME"/>
+    </resultMap>
+
+    <select id="findByUsername" resultMap="syncUserResult">
+        SELECT * FROM SYNC_USERS WHERE USERNAME = #{username} AND STATUS = 1
+    </select>
+
+    <select id="getById" resultMap="syncUserResult">
+        SELECT * FROM SYNC_USERS WHERE ID = #{id}
+    </select>
+
+</mapper>

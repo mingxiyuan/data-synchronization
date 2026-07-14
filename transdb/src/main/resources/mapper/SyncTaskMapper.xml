@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.scxd.mapper.SyncTaskMapper">
+
+    <resultMap id="syncTaskResult" type="com.trans.model.entity.SyncTask">
+        <id property="id" column="ID"/>
+        <result property="name" column="NAME"/>
+        <result property="sourceConnId" column="SOURCE_CONN_ID"/>
+        <result property="targetConnId" column="TARGET_CONN_ID"/>
+        <result property="sourceTable" column="SOURCE_TABLE"/>
+        <result property="sourceSql" column="SOURCE_SQL"/>
+        <result property="targetTable" column="TARGET_TABLE"/>
+        <result property="fieldMapping" column="FIELD_MAPPING"/>
+        <result property="customPk" column="CUSTOM_PK"/>
+        <result property="markerField" column="MARKER_FIELD"/>
+        <result property="lastMarkerValue" column="LAST_MARKER_VALUE"/>
+        <result property="checkpointData" column="CHECKPOINT_DATA"/>
+        <result property="primaryKeys" column="PRIMARY_KEYS"/>
+        <result property="sourceWhere" column="SOURCE_WHERE"/>
+        <result property="strategy" column="STRATEGY"/>
+        <result property="fetchMode" column="FETCH_MODE"/>
+        <result property="syncMode" column="SYNC_MODE"/>
+        <result property="batchSize" column="BATCH_SIZE"/>
+        <result property="taskGroup" column="TASK_GROUP"/>
+        <result property="scheduleId" column="SCHEDULE_ID"/>
+        <result property="runStatus" column="RUN_STATUS"/>
+        <result property="lastRunTime" column="LAST_RUN_TIME"/>
+        <result property="nextRunTime" column="NEXT_RUN_TIME"/>
+        <result property="totalRowsSynced" column="TOTAL_ROWS_SYNCED"/>
+        <result property="noUpdate" column="NO_UPDATE"/>
+        <result property="status" column="STATUS"/>
+        <result property="remark" column="REMARK"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="syncTaskResult">
+        SELECT * FROM SYNC_TASK WHERE STATUS = 1 ORDER BY CREATE_TIME DESC
+    </select>
+
+    <select id="getById" resultMap="syncTaskResult">
+        SELECT * FROM SYNC_TASK WHERE ID = #{id}
+    </select>
+
+    <select id="listByStatuses" resultMap="syncTaskResult">
+        SELECT * FROM SYNC_TASK WHERE RUN_STATUS IN
+        <foreach collection="statuses" item="s" open="(" close=")" separator=",">
+            #{s}
+        </foreach>
+    </select>
+
+    <select id="listByScheduleId" resultMap="syncTaskResult">
+        SELECT * FROM SYNC_TASK WHERE SCHEDULE_ID = #{scheduleId} AND STATUS = 1
+    </select>
+
+    <!-- 按调度ID统计任务数（避免全表查出后在Java中统计） -->
+    <select id="countByScheduleId" resultType="int">
+        SELECT COUNT(*) FROM SYNC_TASK WHERE SCHEDULE_ID = #{scheduleId} AND STATUS = 1
+    </select>
+
+    <!-- 检查调度下是否存在有效任务 -->
+    <select id="existsByScheduleId" resultType="int">
+        SELECT COUNT(*) FROM SYNC_TASK WHERE SCHEDULE_ID = #{scheduleId} AND STATUS = 1
+    </select>
+
+    <insert id="insert" parameterType="com.trans.model.entity.SyncTask">
+        INSERT INTO SYNC_TASK(ID, NAME, SOURCE_CONN_ID, TARGET_CONN_ID, SOURCE_TABLE, SOURCE_SQL, TARGET_TABLE,
+        FIELD_MAPPING, CUSTOM_PK, MARKER_FIELD, LAST_MARKER_VALUE, PRIMARY_KEYS, SOURCE_WHERE,
+        STRATEGY, FETCH_MODE, SYNC_MODE, BATCH_SIZE, TASK_GROUP, SCHEDULE_ID, RUN_STATUS, LAST_RUN_TIME, NEXT_RUN_TIME,
+        TOTAL_ROWS_SYNCED, NO_UPDATE, STATUS, REMARK, CREATE_TIME, UPDATE_TIME)
+        VALUES(#{id}, #{name}, #{sourceConnId}, #{targetConnId}, #{sourceTable}, #{sourceSql,jdbcType=CLOB}, #{targetTable},
+        #{fieldMapping,jdbcType=CLOB}, #{customPk}, #{markerField}, #{lastMarkerValue}, #{primaryKeys}, #{sourceWhere},
+        #{strategy}, #{fetchMode}, #{syncMode}, #{batchSize}, #{taskGroup}, #{scheduleId}, #{runStatus}, #{lastRunTime}, #{nextRunTime},
+        #{totalRowsSynced}, #{noUpdate}, #{status}, #{remark}, #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="update" parameterType="com.trans.model.entity.SyncTask">
+        UPDATE SYNC_TASK SET NAME=#{name}, SOURCE_CONN_ID=#{sourceConnId}, TARGET_CONN_ID=#{targetConnId},
+        SOURCE_TABLE=#{sourceTable}, SOURCE_SQL=#{sourceSql,jdbcType=CLOB}, TARGET_TABLE=#{targetTable}, FIELD_MAPPING=#{fieldMapping,jdbcType=CLOB},
+        CUSTOM_PK=#{customPk}, MARKER_FIELD=#{markerField}, LAST_MARKER_VALUE=#{lastMarkerValue}, PRIMARY_KEYS=#{primaryKeys},
+        SOURCE_WHERE=#{sourceWhere}, STRATEGY=#{strategy}, FETCH_MODE=#{fetchMode}, SYNC_MODE=#{syncMode}, BATCH_SIZE=#{batchSize},
+        TASK_GROUP=#{taskGroup}, SCHEDULE_ID=#{scheduleId}, RUN_STATUS=#{runStatus}, LAST_RUN_TIME=#{lastRunTime}, NEXT_RUN_TIME=#{nextRunTime},
+        TOTAL_ROWS_SYNCED=#{totalRowsSynced}, NO_UPDATE=#{noUpdate}, STATUS=#{status}, REMARK=#{remark}, UPDATE_TIME=#{updateTime}
+        WHERE ID=#{id}
+    </update>
+
+    <update id="updateMarker">
+        UPDATE SYNC_TASK SET LAST_MARKER_VALUE=#{lastMarkerValue}, UPDATE_TIME=#{updateTime} WHERE ID=#{id}
+    </update>
+
+    <update id="updateCheckpoint">
+        UPDATE SYNC_TASK SET CHECKPOINT_DATA=#{checkpointData,jdbcType=CLOB}, UPDATE_TIME=SYSTIMESTAMP WHERE ID=#{id}
+    </update>
+
+    <update id="clearCheckpoint">
+        UPDATE SYNC_TASK SET CHECKPOINT_DATA = NULL, UPDATE_TIME = SYSTIMESTAMP WHERE ID = #{id}
+    </update>
+
+    <update id="updateRunStatus">
+        UPDATE SYNC_TASK SET RUN_STATUS=#{runStatus}, UPDATE_TIME=#{updateTime} WHERE ID=#{id}
+    </update>
+
+    <update id="deleteLogic">
+        UPDATE SYNC_TASK SET STATUS = 0, UPDATE_TIME = #{updateTime} WHERE ID = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM SYNC_TASK WHERE ID = #{id}
+    </delete>
+
+</mapper>

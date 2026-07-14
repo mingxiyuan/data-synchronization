@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.scxd.mapper.ScheduleMapper">
+
+    <resultMap id="scheduleResult" type="com.trans.model.entity.Schedule">
+        <id property="id" column="ID"/>
+        <result property="name" column="NAME"/>
+        <result property="cron" column="CRON"/>
+        <result property="once" column="ONCE" javaType="java.lang.Boolean"/>
+        <result property="desc" column="DESC_"/>
+        <result property="enabled" column="ENABLED" javaType="java.lang.Boolean"/>
+        <result property="status" column="STATUS"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="scheduleResult">
+        SELECT * FROM SCHEDULE WHERE STATUS = 1 ORDER BY CREATE_TIME DESC
+    </select>
+
+    <select id="getById" resultMap="scheduleResult">
+        SELECT * FROM SCHEDULE WHERE ID = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.trans.model.entity.Schedule">
+        INSERT INTO SCHEDULE(ID, NAME, CRON, ONCE, DESC_, ENABLED, STATUS, CREATE_TIME, UPDATE_TIME)
+        VALUES(#{id}, #{name}, #{cron}, #{once,jdbcType=NUMERIC}, #{desc}, #{enabled,jdbcType=NUMERIC}, 1, #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="update" parameterType="com.trans.model.entity.Schedule">
+        UPDATE SCHEDULE SET NAME=#{name}, CRON=#{cron}, ONCE=#{once,jdbcType=NUMERIC},
+        DESC_=#{desc}, ENABLED=#{enabled,jdbcType=NUMERIC}, UPDATE_TIME=#{updateTime}
+        WHERE ID=#{id}
+    </update>
+
+    <update id="deleteLogic">
+        UPDATE SCHEDULE SET STATUS = 0, UPDATE_TIME = #{updateTime} WHERE ID = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM SCHEDULE WHERE ID = #{id}
+    </delete>
+
+</mapper>

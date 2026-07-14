@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.scxd.mapper.SyncTaskLogMapper">
+
+    <resultMap id="syncTaskLogResult" type="com.trans.model.entity.SyncTaskLog">
+        <id property="id" column="ID"/>
+        <result property="taskId" column="TASK_ID"/>
+        <result property="taskName" column="TASK_NAME"/>
+        <result property="syncMode" column="SYNC_MODE"/>
+        <result property="status" column="STATUS"/>
+        <result property="totalCount" column="TOTAL_COUNT"/>
+        <result property="successCount" column="SUCCESS_COUNT"/>
+        <result property="failCount" column="FAIL_COUNT"/>
+        <result property="insertCount" column="INSERT_COUNT"/>
+        <result property="updateCount" column="UPDATE_COUNT"/>
+        <result property="skipCount" column="SKIP_COUNT"/>
+        <result property="errorMsg" column="ERROR_MSG"/>
+        <result property="startTime" column="START_TIME"/>
+        <result property="endTime" column="END_TIME"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="syncTaskLogResult">
+        SELECT * FROM SYNC_TASK_LOG ORDER BY START_TIME DESC
+    </select>
+
+    <!-- 带过滤条件的分页查询 -->
+    <select id="listByCondition" resultMap="syncTaskLogResult" parameterType="map">
+        SELECT * FROM SYNC_TASK_LOG
+        <where>
+            <if test="status != null">
+                AND STATUS = #{status}
+            </if>
+            <if test="taskId != null">
+                AND TASK_ID = #{taskId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND TASK_NAME LIKE '%' || LOWER(#{keyword}) || '%'
+            </if>
+            <if test="startTimeAfter != null">
+                AND START_TIME &gt;= #{startTimeAfter}
+            </if>
+            <if test="endTimeAfter != null">
+                AND END_TIME &gt;= #{endTimeAfter}
+            </if>
+            <if test="endTimeBefore != null">
+                AND END_TIME &lt;= #{endTimeBefore}
+            </if>
+            <if test="startTimeFrom != null">
+                AND START_TIME &gt;= #{startTimeFrom}
+            </if>
+            <if test="startTimeTo != null">
+                AND START_TIME &lt; #{startTimeTo}
+            </if>
+            <if test="today != null and today == true">
+                AND TRUNC(START_TIME) = TRUNC(SYSDATE)
+            </if>
+        </where>
+        ORDER BY START_TIME DESC
+    </select>
+
+    <!-- 带过滤条件的分页查询（MySQL兼容版，按需使用） -->
+    <select id="listByConditionMysql" resultMap="syncTaskLogResult" parameterType="map">
+        SELECT * FROM SYNC_TASK_LOG
+        <where>
+            <if test="status != null">
+                AND STATUS = #{status}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (LOWER(TASK_ID) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                     OR LOWER(TASK_NAME) LIKE CONCAT('%', LOWER(#{keyword}), '%'))
+            </if>
+            <if test="startTimeAfter != null">
+                AND START_TIME &gt;= #{startTimeAfter}
+            </if>
+            <if test="endTimeAfter != null">
+                AND END_TIME &gt;= #{endTimeAfter}
+            </if>
+            <if test="endTimeBefore != null">
+                AND END_TIME &lt;= #{endTimeBefore}
+            </if>
+            <if test="startTimeFrom != null">
+                AND START_TIME &gt;= #{startTimeFrom}
+            </if>
+            <if test="startTimeTo != null">
+                AND START_TIME &lt; #{startTimeTo}
+            </if>
+            <if test="today != null and today == true">
+                AND DATE(START_TIME) = CURDATE()
+            </if>
+        </where>
+        ORDER BY START_TIME DESC
+    </select>
+
+    <select id="listByTaskId" resultMap="syncTaskLogResult">
+        SELECT * FROM SYNC_TASK_LOG WHERE TASK_ID = #{taskId} ORDER BY START_TIME DESC
+    </select>
+
+    <select id="getById" resultMap="syncTaskLogResult">
+        SELECT * FROM SYNC_TASK_LOG WHERE ID = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.trans.model.entity.SyncTaskLog">
+        INSERT INTO SYNC_TASK_LOG(ID, TASK_ID, TASK_NAME, SYNC_MODE, STATUS, TOTAL_COUNT,
+        SUCCESS_COUNT, FAIL_COUNT, INSERT_COUNT, UPDATE_COUNT, SKIP_COUNT, ERROR_MSG, START_TIME, END_TIME)
+        VALUES(#{id}, #{taskId}, #{taskName}, #{syncMode}, #{status}, #{totalCount},
+        #{successCount}, #{failCount}, #{insertCount}, #{updateCount}, #{skipCount},
+        #{errorMsg,jdbcType=CLOB}, #{startTime}, #{endTime})
+    </insert>
+
+    <update id="updateResult" parameterType="com.trans.model.entity.SyncTaskLog">
+        UPDATE SYNC_TASK_LOG SET STATUS=#{status}, TOTAL_COUNT=#{totalCount},
+        SUCCESS_COUNT=#{successCount}, FAIL_COUNT=#{failCount},
+        INSERT_COUNT=#{insertCount}, UPDATE_COUNT=#{updateCount}, SKIP_COUNT=#{skipCount},
+        ERROR_MSG=#{errorMsg,jdbcType=CLOB}, END_TIME=#{endTime}
+        WHERE ID=#{id}
+    </update>
+
+    <select id="getLatestByTaskId" resultMap="syncTaskLogResult">
+        SELECT * FROM (
+            SELECT * FROM SYNC_TASK_LOG WHERE TASK_ID = #{taskId} AND STATUS = 1
+            ORDER BY START_TIME DESC
+        ) WHERE ROWNUM &lt;= 1
+    </select>
+
+    <!-- 今日日志统计（数据库端聚合，避免全量加载） -->
+    <resultMap id="todaySummaryResult" type="com.trans.model.dto.TodaySummaryDto">
+        <result property="totalExecutions" column="TOTAL_EXECUTIONS"/>
+        <result property="successCount" column="SUCCESS_COUNT"/>
+        <result property="failCount" column="FAIL_COUNT"/>
+        <result property="warningCount" column="WARNING_COUNT"/>
+        <result property="totalRowsSynced" column="TOTAL_ROWS_SYNCED"/>
+        <result property="totalErrorRows" column="TOTAL_ERROR_ROWS"/>
+        <result property="totalDurationMs" column="TOTAL_DURATION_MS"/>
+    </resultMap>
+
+    <select id="todaySummary" resultMap="todaySummaryResult">
+        SELECT COUNT(*) AS TOTAL_EXECUTIONS,
+               SUM(CASE WHEN STATUS = 2 THEN 1 ELSE 0 END) AS SUCCESS_COUNT,
+               SUM(CASE WHEN STATUS = 3 THEN 1 ELSE 0 END) AS FAIL_COUNT,
+               SUM(CASE WHEN STATUS = 1 THEN 1 ELSE 0 END) AS WARNING_COUNT,
+               NVL(SUM(SUCCESS_COUNT), 0) AS TOTAL_ROWS_SYNCED,
+               NVL(SUM(FAIL_COUNT), 0) AS TOTAL_ERROR_ROWS,
+               NVL(SUM(CASE WHEN START_TIME IS NOT NULL AND END_TIME IS NOT NULL
+                       THEN (CAST(end_time AS DATE) - CAST(start_time AS DATE)) * 24 * 3600000 ELSE 0 END), 0) AS TOTAL_DURATION_MS
+        FROM SYNC_TASK_LOG
+        WHERE TRUNC(START_TIME) = TRUNC(SYSDATE)
+    </select>
+
+    <!-- 今日日志统计（MySQL语法） -->
+    <select id="todaySummaryMysql" resultMap="todaySummaryResult">
+        SELECT COUNT(*) AS TOTAL_EXECUTIONS,
+               SUM(CASE WHEN STATUS = 2 THEN 1 ELSE 0 END) AS SUCCESS_COUNT,
+               SUM(CASE WHEN STATUS = 3 THEN 1 ELSE 0 END) AS FAIL_COUNT,
+               SUM(CASE WHEN STATUS = 1 THEN 1 ELSE 0 END) AS WARNING_COUNT,
+               IFNULL(SUM(SUCCESS_COUNT), 0) AS TOTAL_ROWS_SYNCED,
+               IFNULL(SUM(FAIL_COUNT), 0) AS TOTAL_ERROR_ROWS,
+               IFNULL(SUM(CASE WHEN START_TIME IS NOT NULL AND END_TIME IS NOT NULL
+                       THEN TIMESTAMPDIFF(SECOND, START_TIME, END_TIME) * 1000 ELSE 0 END), 0) AS TOTAL_DURATION_MS
+        FROM SYNC_TASK_LOG
+        WHERE DATE(START_TIME) = CURDATE()
+    </select>
+
+    <!-- 按任务ID统计（避免N+1查询） -->
+    <resultMap id="taskLogStatsResult" type="com.trans.model.dto.TaskLogStatsDto">
+        <result property="taskId" column="TASK_ID"/>
+        <result property="syncCount" column="SYNC_COUNT"/>
+        <result property="successCount" column="SUCCESS_COUNT"/>
+        <result property="failCount" column="FAIL_COUNT"/>
+        <result property="lastSyncTime" column="LAST_SYNC_TIME"/>
+    </resultMap>
+
+    <select id="countByTaskIdGroupByStatus" resultMap="taskLogStatsResult">
+        SELECT TASK_ID,
+               COUNT(*) AS SYNC_COUNT,
+               SUM(CASE WHEN STATUS = 2 THEN 1 ELSE 0 END) AS SUCCESS_COUNT,
+               SUM(CASE WHEN STATUS = 3 THEN 1 ELSE 0 END) AS FAIL_COUNT,
+               MAX(START_TIME) AS LAST_SYNC_TIME
+        FROM SYNC_TASK_LOG
+        WHERE TASK_ID IN
+        <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">
+            #{taskId}
+        </foreach>
+        GROUP BY TASK_ID
+    </select>
+
+</mapper>

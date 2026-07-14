@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.scxd.mapper.SyncDbConnMapper">
+
+    <resultMap id="syncDbConnResult" type="com.trans.model.entity.SyncDbConn">
+        <id property="id" column="ID"/>
+        <result property="name" column="NAME"/>
+        <result property="dbType" column="DB_TYPE"/>
+        <result property="host" column="HOST"/>
+        <result property="port" column="PORT"/>
+        <result property="databaseName" column="DATABASE_NAME"/>
+        <result property="jdbcUrl" column="JDBC_URL"/>
+        <result property="username" column="USERNAME"/>
+        <result property="password" column="PASSWORD"/>
+        <result property="driverClass" column="DRIVER_CLASS"/>
+        <result property="schema" column="SCHEMA"/>
+        <result property="remark" column="REMARK"/>
+        <result property="status" column="STATUS"/>
+        <result property="createTime" column="CREATE_TIME"/>
+        <result property="updateTime" column="UPDATE_TIME"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="syncDbConnResult">
+        SELECT * FROM SYNC_DB_CONN WHERE STATUS = 1 ORDER BY CREATE_TIME DESC
+    </select>
+
+    <select id="getById" resultMap="syncDbConnResult">
+        SELECT * FROM SYNC_DB_CONN WHERE ID = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.trans.model.entity.SyncDbConn">
+        INSERT INTO SYNC_DB_CONN(ID, NAME, DB_TYPE, HOST, PORT, DATABASE_NAME, JDBC_URL,
+        USERNAME, PASSWORD, DRIVER_CLASS, SCHEMA, REMARK, STATUS, CREATE_TIME, UPDATE_TIME)
+        VALUES(#{id}, #{name}, #{dbType}, #{host}, #{port}, #{databaseName}, #{jdbcUrl},
+        #{username}, #{password}, #{driverClass}, #{schema}, #{remark}, #{status}, #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="update" parameterType="com.trans.model.entity.SyncDbConn">
+        UPDATE SYNC_DB_CONN SET NAME=#{name}, DB_TYPE=#{dbType}, HOST=#{host}, PORT=#{port},
+        DATABASE_NAME=#{databaseName}, JDBC_URL=#{jdbcUrl}, USERNAME=#{username}, PASSWORD=#{password},
+        DRIVER_CLASS=#{driverClass}, SCHEMA=#{schema}, REMARK=#{remark}, STATUS=#{status},
+        UPDATE_TIME=#{updateTime} WHERE ID=#{id}
+    </update>
+
+    <update id="deleteLogic">
+        UPDATE SYNC_DB_CONN SET STATUS = 0, UPDATE_TIME = #{updateTime} WHERE ID = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM SYNC_DB_CONN WHERE ID = #{id}
+    </delete>
+
+</mapper>
